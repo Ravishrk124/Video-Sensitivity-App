@@ -30,7 +30,7 @@ export default function Footer() {
                                     </h3>
                                 </div>
                                 <p className="text-xs text-gray-300 leading-relaxed">
-                                    <strong className="text-blue-400">Hugging Face</strong> transformer models detect sensitive content with <strong className="text-green-400">high accuracy</strong>
+                                    <strong className="text-blue-400">Sightengine AI</strong> multi-model detection (NSFW, Violence, Gore) with <strong className="text-green-400">professional accuracy</strong>
                                 </p>
                             </div>
 
@@ -93,10 +93,10 @@ export default function Footer() {
                         {/* Compact How It Works */}
                         <div className="bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-pink-600/20 rounded-xl px-4 py-3 border border-blue-500/20">
                             <p className="text-[9px] text-gray-300 leading-relaxed text-center">
-                                <strong className="text-blue-300">Enhanced AI Analysis:</strong> Extracts 5 strategic frames (10%, 30%, 50%, 70%, 90%) →
-                                <strong className="text-purple-300"> Multi-Criteria Evaluation</strong> (skin exposure, violent content, suggestive poses, inappropriate imagery) →
-                                <strong className="text-pink-300"> Weighted Averaging</strong> (middle frames prioritized) →
-                                Variance detection → Auto-flags if ≥50% confidence
+                                <strong className="text-blue-300">Sightengine Multi-Model AI:</strong> Extracts 12 frames → Smart samples 6 key frames →
+                                <strong className="text-purple-300"> 3 Specialized Detectors</strong> (Nudity 2.0, Gore, Offensive) →
+                                <strong className="text-pink-300"> Weighted Composite Scoring</strong> →
+                                Risk classification (Low/Medium/High) → Auto-flags ≥50% confidence
                             </p>
                         </div>
                         {/* Copyright - Ultra Compact */}

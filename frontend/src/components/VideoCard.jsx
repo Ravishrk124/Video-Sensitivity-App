@@ -77,12 +77,12 @@ export default function VideoCard({
       objectUrlRef.current = u;
       setThumbnailSrc(u);
       return () => {
-        try { URL.revokeObjectURL(u); } catch (e) {}
+        try { URL.revokeObjectURL(u); } catch (e) { }
         objectUrlRef.current = null;
       };
     } else {
       if (objectUrlRef.current) {
-        try { URL.revokeObjectURL(objectUrlRef.current); } catch (e) {}
+        try { URL.revokeObjectURL(objectUrlRef.current); } catch (e) { }
         objectUrlRef.current = null;
       }
     }
@@ -143,7 +143,7 @@ export default function VideoCard({
             vid.removeAttribute('src');
             vid.src = '';
             vid.load && vid.load();
-          } catch (e) {}
+          } catch (e) { }
         };
 
         const to = setTimeout(() => {
@@ -159,7 +159,7 @@ export default function VideoCard({
             if (vid.duration && Number.isFinite(vid.duration)) {
               t = Math.min(1, Math.max(0.1, vid.duration / 4));
             }
-          } catch (e) {}
+          } catch (e) { }
           const trySeek = () => {
             if (done) return;
             const onSeeked = () => {
@@ -211,9 +211,9 @@ export default function VideoCard({
 
           const p = vid.play();
           if (p && typeof p.then === 'function') {
-            p.then(() => { try { vid.pause(); } catch (e) {} ; trySeek(); }).catch(() => { trySeek(); });
+            p.then(() => { try { vid.pause(); } catch (e) { }; trySeek(); }).catch(() => { trySeek(); });
           } else {
-            try { vid.pause(); } catch (e) {}
+            try { vid.pause(); } catch (e) { }
             trySeek();
           }
         };
@@ -231,7 +231,7 @@ export default function VideoCard({
 
         try {
           vid.src = url;
-          try { vid.load(); } catch (e) {}
+          try { vid.load(); } catch (e) { }
         } catch (err) {
           clearTimeout(to);
           cleanup();
@@ -246,7 +246,7 @@ export default function VideoCard({
         try {
           const blobUrl = await captureFrame(u, 6000);
           if (probeAbortRef.current.aborted) {
-            try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+            try { URL.revokeObjectURL(blobUrl); } catch (e) { }
             break;
           }
           setThumbnailSrc(blobUrl);
@@ -261,7 +261,7 @@ export default function VideoCard({
     return () => {
       probeAbortRef.current.aborted = true;
       if (generatedThumbRef.current) {
-        try { URL.revokeObjectURL(generatedThumbRef.current); } catch (e) {}
+        try { URL.revokeObjectURL(generatedThumbRef.current); } catch (e) { }
         generatedThumbRef.current = null;
       }
     };
@@ -287,11 +287,11 @@ export default function VideoCard({
   useEffect(() => {
     return () => {
       if (objectUrlRef.current) {
-        try { URL.revokeObjectURL(objectUrlRef.current); } catch (e) {}
+        try { URL.revokeObjectURL(objectUrlRef.current); } catch (e) { }
         objectUrlRef.current = null;
       }
       if (generatedThumbRef.current) {
-        try { URL.revokeObjectURL(generatedThumbRef.current); } catch (e) {}
+        try { URL.revokeObjectURL(generatedThumbRef.current); } catch (e) { }
         generatedThumbRef.current = null;
       }
     };
@@ -426,6 +426,130 @@ export default function VideoCard({
         <div className="meta-vertical">
           <div className="meta-line"><strong>Size:</strong> {formatSize(video.size || 0)}</div>
           <div className="meta-line"><strong>Date:</strong> {displayDate}</div>
+
+          {/* Enhanced AI Analysis Details */}
+          {((video.sensitivityScore && video.sensitivityScore > 0) || video.analysis || video.categoryScores) && (
+            <div className="ai-analysis-box" style={{ marginTop: 8, padding: 10, background: '#f8fafc', borderRadius: 8, fontSize: '0.85rem', border: '1px solid #e2e8f0' }}>
+
+              {/* Risk Level Badge */}
+              {video.riskLevel && (
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    background: video.riskLevel === 'high' ? '#fee2e2' :
+                      video.riskLevel === 'medium' ? '#fef3c7' :
+                        video.riskLevel === 'low-medium' ? '#dbeafe' : '#dcfce7',
+                    color: video.riskLevel === 'high' ? '#991b1b' :
+                      video.riskLevel === 'medium' ? '#92400e' :
+                        video.riskLevel === 'low-medium' ? '#1e40af' : '#166534'
+                  }}>
+                    Risk: {video.riskLevel.toUpperCase()}
+                  </span>
+                </div>
+              )}
+
+              {/* Overall Score Bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <strong style={{ fontSize: '0.75rem', color: '#475569', minWidth: 60 }}>Overall:</strong>
+                <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.min(100, video.sensitivityScore || 0)}%`,
+                    height: '100%',
+                    background: (video.sensitivityScore || 0) >= 70 ? '#ef4444' :
+                      (video.sensitivityScore || 0) >= 50 ? '#f59e0b' :
+                        (video.sensitivityScore || 0) >= 30 ? '#3b82f6' : '#22c55e',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: '600', minWidth: 35 }}>
+                  {video.sensitivityScore || 0}%
+                </span>
+              </div>
+
+              {/* Category Scores */}
+              {video.categoryScores && (video.categoryScores.nsfw > 0 || video.categoryScores.violence > 0 || video.categoryScores.scene > 0) && (
+                <div style={{ marginTop: 8, display: 'grid', gap: 4 }}>
+                  {video.categoryScores.nsfw > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', minWidth: 60 }}>🔞 NSFW:</span>
+                      <div style={{ flex: 1, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${Math.min(100, video.categoryScores.nsfw)}%`,
+                          height: '100%',
+                          background: '#ef4444'
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', minWidth: 35 }}>
+                        {video.categoryScores.nsfw}%
+                      </span>
+                    </div>
+                  )}
+
+                  {video.categoryScores.violence > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', minWidth: 60 }}>⚔️ Violence:</span>
+                      <div style={{ flex: 1, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${Math.min(100, video.categoryScores.violence)}%`,
+                          height: '100%',
+                          background: '#f59e0b'
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', minWidth: 35 }}>
+                        {video.categoryScores.violence}%
+                      </span>
+                    </div>
+                  )}
+
+                  {video.categoryScores.scene > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', minWidth: 60 }}>🎬 Scene:</span>
+                      <div style={{ flex: 1, height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${Math.min(100, video.categoryScores.scene)}%`,
+                          height: '100%',
+                          background: '#6366f1'
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', minWidth: 35 }}>
+                        {video.categoryScores.scene}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Analysis Text */}
+              {video.analysis && (
+                <div style={{
+                  color: '#334155',
+                  marginTop: 8,
+                  paddingTop: 8,
+                  borderTop: '1px solid #e2e8f0',
+                  lineHeight: 1.4,
+                  fontSize: '0.8rem'
+                }}>
+                  {video.analysis}
+                </div>
+              )}
+
+              {/* Metadata */}
+              {video.aiMetadata && video.aiMetadata.framesAnalyzed && (
+                <div style={{
+                  marginTop: 6,
+                  fontSize: '0.7rem',
+                  color: '#94a3b8',
+                  fontStyle: 'italic'
+                }}>
+                  Analyzed {video.aiMetadata.framesAnalyzed}/{video.aiMetadata.totalFrames} frames
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="actions">

@@ -17,6 +17,16 @@ const VideoSchema = new mongoose.Schema({
   size: { type: Number }, // file size in bytes
   duration: { type: Number, default: 0 }, // duration in seconds
   thumbnail: { type: String },
+  analysis: { type: String }, // Detailed analysis text
+  // Enhanced AI Analysis Fields
+  riskLevel: { type: String }, // 'low', 'low-medium', 'medium', 'high'
+  categoryScores: {
+    nsfw: { type: Number, default: 0 },
+    violence: { type: Number, default: 0 },
+    scene: { type: Number, default: 0 }
+  },
+  aiMetadata: { type: mongoose.Schema.Types.Mixed }, // Full analysis results
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Video', VideoSchema);

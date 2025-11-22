@@ -1,11 +1,54 @@
+# Dependencies
 node_modules/
-dist/
+package-lock.json
+
+# Environment variables (NEVER commit these!)
 .env
+.env.local
+.env.*.local
 backend/.env
 frontend/.env
+
+# Build outputs
+dist/
+build/
+*.tgz
+
+# Uploads and temporary files
 uploads/
+temp/
+tmp/
+*.tmp
+
+# OS files
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / Editor
 .vscode/
 .idea/
-npm-debug.log
-yarn-error.log
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.cache/
+*.pid
+*.seed
+*.pid.lock

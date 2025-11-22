@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
 const ffmpeg = require('fluent-ffmpeg');
+const { analyzeVideo } = require('../services/aiService');
 
 const UPLOAD_ROOT = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOAD_ROOT)) fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
@@ -48,8 +49,8 @@ function readMetaForFile(filename) {
 function makeItemFromFile(filename, idx = 0) {
   const filePath = path.join(UPLOAD_ROOT, filename);
   let createdAt = new Date().toISOString();
-  try { createdAt = fs.statSync(filePath).mtime.toISOString(); } catch(e){}
-  const size = (() => { try { return fs.statSync(filePath).size; } catch(e){ return 0; } })();
+  try { createdAt = fs.statSync(filePath).mtime.toISOString(); } catch (e) { }
+  const size = (() => { try { return fs.statSync(filePath).size; } catch (e) { return 0; } })();
 
   let thumbnail = null;
   let duration = 0;
@@ -58,7 +59,7 @@ function makeItemFromFile(filename, idx = 0) {
     const thumbName = `${filename}-thumb.png`;
     const thumbAbs = path.join(THUMBS_DIR, thumbName);
     if (fs.existsSync(thumbAbs)) thumbnail = `/uploads/thumbnails/${thumbName}`;
-  } catch (e) {}
+  } catch (e) { }
 
   const meta = readMetaForFile(filename);
   if (meta) {
@@ -90,7 +91,7 @@ router.get('/', async (req, res) => {
     const files = fs.existsSync(UPLOAD_ROOT)
       ? fs.readdirSync(UPLOAD_ROOT).filter(f => f !== 'thumbnails' && !f.endsWith('.meta.json'))
       : [];
-    const items = files.map((f,i) => makeItemFromFile(f,i));
+    const items = files.map((f, i) => makeItemFromFile(f, i));
     return res.json(items);
   } catch (err) {
     console.error('List videos error', err);
@@ -184,12 +185,76 @@ router.post('/upload', upload.single('file'), async (req, res) => {
           console.warn('[UPLOAD-BG] thumb creation failed for', videoPath, (thumbErr && thumbErr.message) || thumbErr);
         }
 
-        // update DB/doc if possible; else write meta JSON
+        // AI Analysis: Extract frames and analyze
+        let analysisResult = null;
+        const framesDir = path.join(UPLOAD_ROOT, 'frames', file.filename);
+        try {
+          if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
+
+          console.log('[UPLOAD-BG] Extracting frames for AI analysis...');
+          await new Promise((resolve, reject) => {
+            ffmpeg(videoPath)
+              .on('end', resolve)
+              .on('error', reject)
+              .screenshots({
+                count: 5,
+                folder: framesDir,
+                filename: 'frame-%i.jpg',
+                size: '640x360'
+              });
+          });
+
+          const frameFiles = fs.readdirSync(framesDir).filter(f => f.endsWith('.jpg'));
+          const framePaths = frameFiles.map(f => path.join(framesDir, f));
+
+          if (framePaths.length > 0) {
+            analysisResult = await analyzeVideo(framePaths);
+            console.log('[UPLOAD-BG] AI Analysis completed', analysisResult);
+          }
+        } catch (aiErr) {
+          console.warn('[UPLOAD-BG] AI analysis failed', aiErr);
+        }
+
+        // Cleanup frames
+        try {
+          if (fs.existsSync(framesDir)) {
+            fs.rmSync(framesDir, { recursive: true, force: true });
+          }
+        } catch (e) { }
+
         if (VideoModel) {
           try {
             const upd = {};
             if (duration) upd.duration = duration;
             if (thumbRel) upd.thumbnail = thumbRel;
+            if (analysisResult) {
+              // Use maxScore for sensitivity determination
+              const maxScore = analysisResult.maxScore || analysisResult.averageScore || 0;
+              upd.sensitivity = maxScore > 0.5 ? 'flagged' : 'safe';
+              upd.sensitivityScore = Math.round(maxScore * 100);
+              upd.analysis = analysisResult.analysis;
+              upd.riskLevel = analysisResult.riskLevel;
+
+              // Category scores
+              upd.categoryScores = {
+                nsfw: Math.round((analysisResult.categories?.nsfw?.max || 0) * 100),
+                violence: Math.round((analysisResult.categories?.violence?.max || 0) * 100),
+                scene: Math.round((analysisResult.categories?.scene?.max || 0) * 100)
+              };
+
+              // Full metadata
+              upd.aiMetadata = {
+                overallScore: Math.round((analysisResult.overallScore || 0) * 100),
+                maxScore: Math.round(maxScore * 100),
+                framesAnalyzed: analysisResult.frameCount,
+                totalFrames: analysisResult.totalFrames,
+                flaggedFrames: analysisResult.flaggedFrames,
+                recommendations: analysisResult.recommendations,
+                categories: analysisResult.categories,
+                temporalAnalysis: analysisResult.temporalAnalysis,
+                metadata: analysisResult.metadata
+              };
+            }
             if (Object.keys(upd).length > 0) {
               await VideoModel.findByIdAndUpdate(saved._id, { $set: upd }, { new: true }).exec();
               console.log('[UPLOAD-BG] DB doc updated', saved._id, upd);
@@ -199,7 +264,17 @@ router.post('/upload', upload.single('file'), async (req, res) => {
           }
         } else {
           const metaPath = path.join(UPLOAD_ROOT, `${file.filename}.meta.json`);
-          const metaObj = { filename: file.filename, originalName: file.originalname, size: file.size, duration, thumbnail: thumbRel, updatedAt: new Date().toISOString() };
+          const metaObj = {
+            filename: file.filename,
+            originalName: file.originalname,
+            size: file.size,
+            duration,
+            thumbnail: thumbRel,
+            updatedAt: new Date().toISOString(),
+            sensitivity: analysisResult ? (analysisResult.averageScore > 0.6 ? 'flagged' : 'safe') : 'safe',
+            score: analysisResult ? analysisResult.averageScore : 0,
+            analysis: analysisResult ? analysisResult.analysis : null
+          };
           try {
             fs.writeFileSync(metaPath, JSON.stringify(metaObj, null, 2));
             console.log('[UPLOAD-BG] wrote meta', metaPath);

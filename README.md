@@ -15,7 +15,8 @@ Create a `.env` file in the `backend` directory:
 PORT=4000
 MONGO_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/?appName=YourApp
 JWT_SECRET=GENERATE_A_RANDOM_SECRET_KEY_HERE
-HUGGINGFACE_API_KEY=
+SIGHTENGINE_USER=your_user_id
+SIGHTENGINE_SECRET=your_secret_key
 UPLOAD_DIR=./uploads
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=YourSecurePassword123
@@ -23,11 +24,12 @@ NODE_ENV=development
 FRONTEND_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
-**Note:** To get a HuggingFace API key:
-1. Sign up at https://huggingface.co
-2. Go to Settings → Access Tokens
-3. Create a new token with "Read" permission
-4. Copy and paste into `HUGGINGFACE_API_KEY`
+**Note:** To get Sightengine API credentials:
+1. Sign up at https://sightengine.com/signup
+2. Go to Dashboard → API Keys
+3. Copy your API User and Secret
+4. Paste into `SIGHTENGINE_USER` and `SIGHTENGINE_SECRET`
+5. Free tier: 2,000 API calls/month
 
 ### 3. Start Backend Server
 ```bash
@@ -99,15 +101,41 @@ You can create additional Editor and Viewer accounts via the registration form.
 
 ## AI Analysis
 
-The system uses HuggingFace's `Falconsai/nsfw_image_detection` model to analyze videos:
+The system uses **Sightengine AI API** for comprehensive video content moderation:
 
-1. Extracts 3 key frames from uploaded videos (start, middle, end)
-2. Sends frames to HuggingFace API
-3. Calculates average sensitivity score (0-100%)
-4. Videos with score ≥50% are flagged as "Flagged"
-5. Videos with score <50% are marked as "Safe"
+1. **Multi-Model Analysis**: Each video is analyzed using 3 specialized AI models:
+   - `nudity-2.0`: Detects NSFW content (nudity, sexual activity, explicit content)
+   - `gore`: Identifies violence, blood, and graphic content
+   - `offensive`: Detects offensive content, hate symbols, weapons
 
-**Without HuggingFace API Key:** The system will use mock/random scores for development.
+2. **Processing Flow**:
+   - Extracts 12 frames uniform from the video
+   - Selects 6 key frames using smart sampling
+   - Each frame analyzed through all 3 models
+   - Calculates weighted composite scores per category
+
+3. **Risk Classification**:
+   - **High Risk** (>70%): Auto-flagged, requires review
+   - **Medium Risk** (50-70%): Flagged for review
+   - **Low-Medium** (30-50%): Minor concerns detected
+   - **Low Risk** (<30%): Content appears safe
+
+4. **Results Include**:
+   - Overall sensitivity score (0-100%)
+   - Category breakdown (NSFW%, Violence%, Scene%)
+   - Risk level badge
+   - Temporal analysis (which frames flagged)
+   - Detailed recommendations
+
+**Setup Requirements:**
+- Sign up at: https://sightengine.com/signup
+- Free tier: 2,000 API calls/month (~333 videos)
+- Add credentials to `.env`:
+  ```env
+  SIGHTENGINE_USER=your_user_id
+  SIGHTENGINE_SECRET=your_secret_key
+  ```
+
 
 ---
 
@@ -118,7 +146,7 @@ The system uses HuggingFace's `Falconsai/nsfw_image_detection` model to analyze 
 - MongoDB (Mongoose)
 - Socket.IO (Real-time updates)
 - FFmpeg (Video processing)
-- HuggingFace API (AI analysis)
+- Sightengine API (AI content moderation)
 - JWT (Authentication)
 
 **Frontend:**

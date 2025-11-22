@@ -97,49 +97,96 @@ async function processVideo(videoId, io, triggeringUserId) {
 
     // Step 3: AI Sensitivity Analysis
     console.log('  🤖 Running AI sensitivity analysis...');
-    let aiResult = { score: 0, sensitivity: 'safe', details: {} };
+    let aiScore = 0;
+    let aiSensitivity = 'safe';
+    let flaggedReason = '';
 
     try {
       emitUpdate({ videoId, progress: 50, status: 'analyzing' });
 
-      aiResult = await aiService.analyzeVideo(videoPath);
+      // Extract more key frames for better analysis (will be smart-sampled by AI service)
+      const framePaths = await ffmpegService.extractKeyFrames(videoPath, 12);
+      const analysisResults = await aiService.analyzeVideo(framePaths);
 
-      console.log(`  ✅ AI Analysis Complete:`, aiResult);
+      // Convert overall score (0-1) to percentage
+      aiScore = Math.round(analysisResults.maxScore * 100); // Use max score for flagging
+      const avgScore = Math.round(analysisResults.overallScore * 100);
 
-      await Video.findByIdAndUpdate(videoId, {
-        // Extract 5 frames at strategic points for comprehensive analysis
-        const framePaths = await ffmpegService.extractKeyFrames(videoPath, 5);
+      // Determine sensitivity based on risk level
+      const riskLevel = analysisResults.riskLevel || 'low';
+      aiSensitivity = ['high', 'medium'].includes(riskLevel) ? 'flagged' : 'safe';
 
-        const analysisResults = await aiService.analyzeVideo(framePaths);
-
-        aiScore = Math.round(analysisResults.averageScore * 100);
-        aiSensitivity = aiScore >= 50 ? 'flagged' : 'safe';
-
-        if(aiScore >= 50) {
-        flaggedReason = `AI detected potential NSFW content (${aiScore}% confidence across 5 frames)`;
+      // Build detailed flagged reason
+      if (aiSensitivity === 'flagged') {
+        const reasons = [];
+        if (analysisResults.categories?.nsfw?.max > 0.5) {
+          reasons.push(`NSFW: ${Math.round(analysisResults.categories.nsfw.max * 100)}%`);
+        }
+        if (analysisResults.categories?.violence?.max > 0.4) {
+          reasons.push(`Violence: ${Math.round(analysisResults.categories.violence.max * 100)}%`);
+        }
+        flaggedReason = `AI detected sensitive content - ${reasons.join(', ')} (Risk: ${riskLevel}, analyzed ${analysisResults.frameCount} frames)`;
       }
 
+      // Extract category scores (round to nearest integer)
+      const categoryScores = {
+        nsfw: Math.round((analysisResults.categories?.nsfw?.max || 0) * 100),
+        violence: Math.round((analysisResults.categories?.violence?.max || 0) * 100),
+        scene: Math.round((analysisResults.categories?.scene?.max || 0) * 100)
+      };
+
+      // Ensure at least 1% shows if detection found anything (not 0%)
+      if (aiScore === 0 && analysisResults.categories) {
+        if (analysisResults.categories.nsfw?.max > 0 ||
+          analysisResults.categories.violence?.max > 0 ||
+          analysisResults.categories.scene?.max > 0) {
+          aiScore = Math.max(
+            categoryScores.nsfw,
+            categoryScores.violence,
+            categoryScores.scene,
+            1 // Minimum 1% if anything detected
+          );
+        }
+      }
+
+      // Update video document with comprehensive AI results
       await Video.findByIdAndUpdate(videoId, {
-        sensitivityScore: aiScore,
+        sensitivityScore: aiScore, // Peak score for flagging
         sensitivity: aiSensitivity,
         flaggedReason,
+        riskLevel,
+        categoryScores,
+        analysis: analysisResults.analysis,
+        aiMetadata: {
+          overallScore: avgScore,
+          maxScore: aiScore,
+          framesAnalyzed: analysisResults.frameCount,
+          totalFrames: analysisResults.totalFrames,
+          flaggedFrames: analysisResults.flaggedFrames,
+          recommendations: analysisResults.recommendations,
+          categories: analysisResults.categories,
+          temporalAnalysis: analysisResults.temporalAnalysis,
+          metadata: analysisResults.metadata
+        },
         progress: 90
       });
 
+      // Emit update to clients
       emitUpdate({
         videoId,
         progress: 90,
         sensitivity: aiSensitivity,
-        sensitivityScore: aiScore
+        sensitivityScore: aiScore,
+        riskLevel,
+        categoryScores
       });
 
-      console.log(`  ✅ AI Analysis complete: ${aiSensitivity} (${aiScore}% confidence from 5 frames)`);
+      console.log(`  ✅ AI Analysis complete: ${aiSensitivity.toUpperCase()} (Peak: ${aiScore}%, Avg: ${avgScore}%, Risk: ${riskLevel})`);
 
-      // Cleanup frames
-      framePaths.forEach(framePath => {
-        if (fs.existsSync(framePath)) fs.unlinkSync(framePath);
+      // Cleanup temporary frame files
+      framePaths.forEach(fp => {
+        if (fs.existsSync(fp)) fs.unlinkSync(fp);
       });
-
     } catch (err) {
       console.error('  ⚠️ AI analysis failed:', err.message);
       // Continue with safe default if AI fails

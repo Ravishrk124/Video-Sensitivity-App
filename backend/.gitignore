@@ -1,11 +1,28 @@
+# Dependencies
 node_modules/
-dist/
+
+# Environment variables (CRITICAL - NEVER COMMIT!)
 .env
-backend/.env
-frontend/.env
+.env.local
+.env.*.local
+
+# Uploads and processed files
 uploads/
+temp/
+frames/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Build
+dist/
+build/
+
+# OS
 .DS_Store
+
+# IDE
 .vscode/
 .idea/
-npm-debug.log
-yarn-error.log
