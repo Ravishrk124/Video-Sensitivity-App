@@ -104,7 +104,7 @@ export default function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
-    window.location.href = '/login';
+    setAuthMode('login'); // Reset to login screen
   };
 
   // If no user, show auth screens without router
