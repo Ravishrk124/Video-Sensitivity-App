@@ -33,7 +33,15 @@ const corsOptions = {
   origin: function (origin, callback) {
     // allow requests with no origin (curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
+
+    // Check if origin is in allowed list
     if (FRONTEND_ORIGINS.indexOf(origin) !== -1) return callback(null, true);
+
+    // Allow all vercel.app subdomains (for preview deployments)
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
+
+    // Log rejected origin for debugging
+    console.warn('⚠️ CORS rejected origin:', origin);
     return callback(new Error('CORS policy: origin not allowed'));
   },
   credentials: true,
